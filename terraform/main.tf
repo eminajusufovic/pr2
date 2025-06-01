@@ -63,8 +63,8 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    from_port   = 5002
-    to_port     = 5002
+    from_port   = 5000             
+    to_port     = 5000             
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -126,7 +126,7 @@ resource "aws_lb_target_group" "frontend_tg" {
 
 resource "aws_lb_target_group" "backend_tg" {
   name     = "backend-tg"
-  port     = 5002
+  port     = 5000              
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
 }
@@ -167,5 +167,5 @@ resource "aws_lb_target_group_attachment" "frontend_attachment" {
 resource "aws_lb_target_group_attachment" "backend_attachment" {
   target_group_arn = aws_lb_target_group.backend_tg.arn
   target_id        = aws_instance.app_server.id
-  port             = 5002
+  port             = 5000             
 }
