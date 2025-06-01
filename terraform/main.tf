@@ -144,8 +144,9 @@ resource "aws_lb" "app_lb" {
   }
 }
 
-resource "aws_lb_target_group" "frontend_tg" {
-  name     = "frontend-tg"
+
+resource "aws_lb_target_group" "app_tg" {
+  name     = "app-tg"
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
@@ -155,32 +156,13 @@ resource "aws_lb_target_group" "frontend_tg" {
     unhealthy_threshold = 3
     timeout             = 5
     interval            = 30
-    path                = "/"
+    path                = "/health"
     matcher             = "200"
+    port                = "80"
   }
 
   tags = {
-    Name = "frontend-target-group"
-  }
-}
-
-resource "aws_lb_target_group" "backend_tg" {
-  name     = "backend-tg"
-  port     = 5000
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.main.id
-
-  health_check {
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
-    path                = "/"  
-    matcher             = "200"
-  }
-
-  tags = {
-    Name = "backend-target-group"
+    Name = "app-target-group"
   }
 }
 
@@ -191,34 +173,12 @@ resource "aws_lb_listener" "app_listener" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.frontend_tg.arn
+    target_group_arn = aws_lb_target_group.app_tg.arn
   }
 }
 
-resource "aws_lb_listener_rule" "backend_rule" {
-  listener_arn = aws_lb_listener.app_listener.arn
-  priority     = 100
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.backend_tg.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/*"]
-    }
-  }
-}
-
-resource "aws_lb_target_group_attachment" "frontend_attachment" {
-  target_group_arn = aws_lb_target_group.frontend_tg.arn
+resource "aws_lb_target_group_attachment" "app_attachment" {
+  target_group_arn = aws_lb_target_group.app_tg.arn
   target_id        = aws_instance.app_server.id
   port             = 80
-}
-
-resource "aws_lb_target_group_attachment" "backend_attachment" {
-  target_group_arn = aws_lb_target_group.backend_tg.arn
-  target_id        = aws_instance.app_server.id
-  port             = 5000
 }
