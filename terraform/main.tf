@@ -4,6 +4,9 @@ provider "aws" {
 
 resource "aws_vpc" "main" {
   cidr_block = var.vpc_cidr
+  tags = {
+    Name = "main-vpc"
+  }
 }
 
 resource "aws_subnet" "public" {
@@ -11,6 +14,9 @@ resource "aws_subnet" "public" {
   cidr_block              = var.public_subnet_cidr
   availability_zone       = "us-east-1a"
   map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet-1"
+  }
 }
 
 resource "aws_subnet" "public_2" {
@@ -18,10 +24,16 @@ resource "aws_subnet" "public_2" {
   cidr_block              = var.public_subnet_cidr_2
   availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
+  tags = {
+    Name = "public-subnet-2"
+  }
 }
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
+  tags = {
+    Name = "main-igw"
+  }
 }
 
 resource "aws_route_table" "public_rt" {
@@ -30,6 +42,10 @@ resource "aws_route_table" "public_rt" {
   route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "public-route-table"
   }
 }
 
@@ -63,8 +79,8 @@ resource "aws_security_group" "ec2_sg" {
   }
 
   ingress {
-    from_port   = 5000             
-    to_port     = 5000             
+    from_port   = 5000
+    to_port     = 5000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -75,12 +91,19 @@ resource "aws_security_group" "ec2_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "ec2-security-group"
+  }
 }
 
 resource "aws_ebs_volume" "db_volume" {
   availability_zone = "us-east-1a"
   size              = 10
   type              = "gp2"
+  tags = {
+    Name = "db-volume"
+  }
 }
 
 resource "aws_instance" "app_server" {
@@ -88,7 +111,7 @@ resource "aws_instance" "app_server" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  key_name               = "vockey"
+  key_name               = var.key_name
   user_data              = file("user_data.sh")
 
   root_block_device {
@@ -115,6 +138,10 @@ resource "aws_lb" "app_lb" {
     aws_subnet.public_2.id
   ]
   security_groups    = [aws_security_group.ec2_sg.id]
+
+  tags = {
+    Name = "app-load-balancer"
+  }
 }
 
 resource "aws_lb_target_group" "frontend_tg" {
@@ -122,13 +149,39 @@ resource "aws_lb_target_group" "frontend_tg" {
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  health_check {
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+    path                = "/"
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "frontend-target-group"
+  }
 }
 
 resource "aws_lb_target_group" "backend_tg" {
   name     = "backend-tg"
-  port     = 5000              
+  port     = 5000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  health_check {
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+    path                = "/"  
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "backend-target-group"
+  }
 }
 
 resource "aws_lb_listener" "app_listener" {
@@ -167,5 +220,5 @@ resource "aws_lb_target_group_attachment" "frontend_attachment" {
 resource "aws_lb_target_group_attachment" "backend_attachment" {
   target_group_arn = aws_lb_target_group.backend_tg.arn
   target_id        = aws_instance.app_server.id
-  port             = 5000             
+  port             = 5000
 }
