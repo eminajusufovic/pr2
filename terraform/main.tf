@@ -144,25 +144,43 @@ resource "aws_lb" "app_lb" {
   }
 }
 
-
-resource "aws_lb_target_group" "app_tg" {
-  name     = "app-tg"
+resource "aws_lb_target_group" "frontend_tg" {
+  name     = "frontend-tg"
   port     = 80
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
 
   health_check {
-    healthy_threshold   = 3
-    unhealthy_threshold = 3
-    timeout             = 5
-    interval            = 30
-    path                = "/health"
+    path                = "/"
     matcher             = "200"
-    port                = "80"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
   }
 
   tags = {
-    Name = "app-target-group"
+    Name = "frontend-target-group"
+  }
+}
+
+resource "aws_lb_target_group" "backend_tg" {
+  name     = "backend-tg"
+  port     = 5000
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path                = "/api/health"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "backend-target-group"
   }
 }
 
@@ -172,13 +190,55 @@ resource "aws_lb_listener" "app_listener" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg.arn
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "Not Found"
+      status_code  = "404"
+    }
   }
 }
 
-resource "aws_lb_target_group_attachment" "app_attachment" {
-  target_group_arn = aws_lb_target_group.app_tg.arn
+resource "aws_lb_listener_rule" "frontend_rule" {
+  listener_arn = aws_lb_listener.app_listener.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_rule" {
+  listener_arn = aws_lb_listener.app_listener.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.backend_tg.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
+  }
+}
+
+resource "aws_lb_target_group_attachment" "frontend_attachment" {
+  target_group_arn = aws_lb_target_group.frontend_tg.arn
   target_id        = aws_instance.app_server.id
   port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "backend_attachment" {
+  target_group_arn = aws_lb_target_group.backend_tg.arn
+  target_id        = aws_instance.app_server.id
+  port             = 5000
 }
